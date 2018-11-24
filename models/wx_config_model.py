@@ -44,10 +44,10 @@ class wx_config_settings(models.TransientModel):
 
     @api.model
     def get_default_wx_appid(self, fields):
-        Param = self.env["ir.config_parameter"]
+        Param = self.env["ir.config_parameter"].sudo()
         return {
-                'wx_appid': Param.get_param('wx_appid', default='appid_xxxxxxxxxxxxxxx'),
-                'wx_AppSecret': Param.get_param('wx_AppSecret', default='appsecret_xxxxxxxxxxxxxx'),
+                'wx_appid': Param.get_param('wx_appid', default=''),
+                'wx_AppSecret': Param.get_param('wx_AppSecret', default=''),
                 'wx_token': Param.get_param('wx_token', default='K5Dtswpte'),
                 }
 
@@ -55,7 +55,7 @@ class wx_config_settings(models.TransientModel):
     def set_wx_appid(self):
         self.ensure_one()
         config = self
-        Param = self.env["ir.config_parameter"]
+        Param = self.env["ir.config_parameter"].sudo()
 
         Param.set_param('wx_appid', config.wx_appid )
         Param.set_param('wx_AppSecret', config.wx_AppSecret )
@@ -87,9 +87,9 @@ class wx_config_settings(models.TransientModel):
         httprequest = request.httprequest
 
         res.update(
-            wx_appid = Param.get_param('wx_appid', default='appid_xxxxxxxxxxxxxxx'),
-            wx_AppSecret = Param.get_param('wx_AppSecret', default='appsecret_xxxxxxxxxxxxxx'),
-            wx_token = Param.get_param('wx_token', default='K5Dtswpte'),
+            wx_appid = Param.get_param('wx_appid', default=''),
+            wx_AppSecret = Param.get_param('wx_AppSecret', default=''),
+            wx_token = Param.get_param('wx_token', default=''),
             wx_AccessToken = client.wxclient._token or '',
             wx_url = 'http://%s/wx_handler'%httprequest.environ.get('HTTP_HOST', '').split(':')[0]
         )
@@ -131,7 +131,7 @@ class wxcorp_config_settings(models.TransientModel):
 
     @api.model
     def get_default_Corp_Id(self, fields):
-        Param = self.env["ir.config_parameter"]
+        Param = self.env["ir.config_parameter"].sudo()
         return {
                 'Corp_Id': Param.get_param('Corp_Id', default='Corp_Id_xxxxxxxxxxxxxxx'),
                 'Corp_Secret': Param.get_param('Corp_Secret', default='Corp_Secret_xxxxxxxxxxxxxx'),
@@ -145,7 +145,7 @@ class wxcorp_config_settings(models.TransientModel):
     def set_Corp_Id(self):
         self.ensure_one()
         config = self
-        Param = self.env["ir.config_parameter"]
+        Param = self.env["ir.config_parameter"].sudo()
 
         Param.set_param('Corp_Id', config.Corp_Id )
         Param.set_param('Corp_Secret', config.Corp_Secret )
