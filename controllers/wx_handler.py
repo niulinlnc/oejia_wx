@@ -26,15 +26,11 @@ def abort(code):
 
 class WxCorpHandler(http.Controller):
 
-    def __init__(self):
-        from ..rpc import corp_client
-        entry = corp_client.CorpEntry()
-        entry.init(request.env)
-        self.crypto = entry.crypto_handle
-
-
     @http.route('/corp_handler', type='http', auth="none", methods=['GET', 'POST'], csrf=False)
     def handle(self, **kwargs):
+        entry = request.env['wx.corp.config'].corpenv()
+        self.crypto = entry.crypto_handle
+
         msg_signature = request.params.get("msg_signature")
         timestamp = request.params.get("timestamp")
         nonce = request.params.get("nonce")
@@ -80,11 +76,13 @@ class WxCorpHandler(http.Controller):
                 from .handlers.event_handler import unsubscribe_handler
                 ret = unsubscribe_handler(request, msg)
         elif msg.type == 'unknown':
-            data = msg._data
-            if data.get('Event')=='open_approval_change':
-                from .handlers.approval_handler import approval_handler
-                approval_handler(request, msg)
+            _ret = self.handle_unknown(msg)
+            if _ret:
+                ret = _ret
+
         reply = create_reply(ret, msg).render()
         res = self.crypto.encrypt_message(reply, request.params.get("nonce"), request.params.get("timestamp"))
         return res
 
+    def handle_unknown(self, msg):
+        return None

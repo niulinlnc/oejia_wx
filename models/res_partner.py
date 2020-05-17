@@ -12,8 +12,8 @@ class res_partner(models.Model):
     wx_user_id = fields.Many2one('wx.user','关联微信用户')
 
     def send_corp_msg(self, msg):
-        from ..rpc import corp_client
-        entry = corp_client.corpenv(self.env)
+        entry = self.env['wx.corp.config'].corpenv()
+        self = self.sudo()
         mtype = msg["mtype"]
         if mtype=="text":
             entry.client.message.send_text(entry.current_agent, self.wxcorp_user_id.userid, msg["content"])
@@ -27,9 +27,11 @@ class res_partner(models.Model):
             entry.client.message.send_voice(entry.current_agent, self.wxcorp_user_id.userid, ret['media_id'])
 
     def get_corp_key(self):
+        self = self.sudo()
         if self.wxcorp_user_id:
             return self.wxcorp_user_id.userid
 
     def get_wx_key(self):
+        self = self.sudo()
         if self.wx_user_id:
             return self.wx_user_id.openid

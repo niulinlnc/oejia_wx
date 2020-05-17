@@ -8,6 +8,7 @@ from werobot.session.memorystorage import MemoryStorage
 from werobot.logger import enable_pretty_logging
 from werobot.reply import create_reply
 
+import odoo
 from openerp import exceptions
 from odoo import fields
 from ..rpc.base import EntryBase
@@ -32,6 +33,11 @@ class WxEntry(EntryBase):
         self.subscribe_auto_msg = None
 
         super(WxEntry, self).__init__()
+
+    def get_path(self, key):
+        data_dir = odoo.tools.config['data_dir']
+        cls_name = 'WxEntryRobot'
+        return '%s/%s-%s/%s'%(data_dir, cls_name, key, self.dbname)
 
     def send_text(self, openid, text):
         try:
@@ -77,7 +83,8 @@ class WxEntry(EntryBase):
         else:
             return create_reply(ret_msg, message=message)
 
-    def init(self, env):
+    def init(self, env, from_ui=False):
+        self.init_data(env)
         dbname = env.cr.dbname
         global WxEnvDict
         if dbname in WxEnvDict:
@@ -93,10 +100,10 @@ class WxEntry(EntryBase):
         if action:
             self.subscribe_auto_msg = config.action.get_wx_reply()
 
-        Param = env['ir.config_parameter'].sudo()
-        self.wx_token = Param.get_param('wx_token') or ''
-        self.wx_appid = Param.get_param('wx_appid') or ''
-        self.wx_AppSecret = Param.get_param('wx_AppSecret') or ''
+        config = env['wx.config'].sudo().get_cur()
+        self.wx_token = config.wx_token
+        self.wx_appid = config.wx_appid
+        self.wx_AppSecret = config.wx_AppSecret
 
         #robot.config["TOKEN"] = self.wx_token
         self.wxclient.appid = self.wx_appid
@@ -109,6 +116,8 @@ class WxEntry(EntryBase):
         except:
             import traceback;traceback.print_exc()
             _logger.error(u'初始化微信客户端token失败，请在微信对接配置中填写好相关信息！')
+            if from_ui:
+                raise exceptions.UserError(u'对接失败，请检查相关信息是否填写正确')
 
         session_storage = MemoryStorage()
         robot = WeRoBot(token=self.wx_token, enable_session=True, logger=_logger, session_storage=session_storage)
@@ -127,4 +136,7 @@ class WxEntry(EntryBase):
         print('wx client init: %s %s'%(self.OPENID_UUID, self.UUID_OPENID))
 
 def wxenv(env):
+    dbname = env.cr.dbname
+    if dbname not in WxEnvDict:
+        WxEntry().init(env)
     return WxEnvDict[env.cr.dbname]
