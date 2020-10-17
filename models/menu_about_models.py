@@ -61,7 +61,7 @@ class wx_menu(models.Model):
     right_action = fields.Reference(string='动作', selection=MENU_ACTION_OPTION)
     sequence = fields.Integer('Sequence', help="sequence")
 
-    mtype = fields.Selection([(1,'公众号'),(2,'企业号')], string='类型', default=1)
+    mtype = fields.Selection([('1','公众号'),('2','企业号')], string='类型', default='1')
 
     #_defaults = {
     #}
@@ -79,8 +79,8 @@ class wx_menu(models.Model):
             m_dict = {
                       'type': 'miniprogram',
                       'name': name,
-                      'url': action.pagepath,# 不支持小程序的老版本客户端将打开本url
-                      'appid': config.app_id or '',
+                      'url': action.url or '',# 不支持小程序的老版本客户端将打开本url
+                      'appid': action.appid or '',
                       'pagepath': action.pagepath
                       }
         else:
@@ -104,17 +104,19 @@ class wx_menu(models.Model):
         else:
             return self._get_menu_action(name, action)
 
-    @api.one
+    @api.multi
     def do_active(self):
-        entry = client.wxenv(self.env)
-        wxclient = entry.wxclient
-        buttons = []
-        if self.left:
-            buttons.append(self._get_menu_item(self.left, self.left_action, self.left_ids))
-        if self.middle:
-            buttons.append(self._get_menu_item(self.middle, self.middle_action, self.middle_ids))
-        if self.right:
-            buttons.append(self._get_menu_item(self.right, self.right_action, self.right_ids))
-        menu_data =  {'button': buttons}
-        _logger.info(">>> active menu %s"%menu_data)
-        wxclient.create_menu(menu_data)
+        objs = self
+        for self in objs:
+            entry = client.wxenv(self.env)
+            wxclient = entry.wxclient
+            buttons = []
+            if self.left:
+                buttons.append(self._get_menu_item(self.left, self.left_action, self.left_ids))
+            if self.middle:
+                buttons.append(self._get_menu_item(self.middle, self.middle_action, self.middle_ids))
+            if self.right:
+                buttons.append(self._get_menu_item(self.right, self.right_action, self.right_ids))
+            menu_data =  {'button': buttons}
+            _logger.info(">>> active menu %s"%menu_data)
+            wxclient.create_menu(menu_data)

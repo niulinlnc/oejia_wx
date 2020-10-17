@@ -6,17 +6,16 @@ import logging
 
 import openerp
 
-from ...rpc import corp_client
 
 _logger = logging.getLogger(__name__)
 
 def kf_handler(request, msg):
-    client = corp_client.corpenv(request.env)
+    client = request.env['wx.corp.config'].corpenv()
     openid = msg.source
     entry = client
     if msg.id==entry.OPENID_LAST.get(openid):
         _logger.info('>>> 重复的微信消息')
-        return
+        return ''
     entry.OPENID_LAST[openid] = msg.id
     # 获取关联的系统用户
     uid = client.OPENID_UID.get(openid, False)
@@ -57,18 +56,17 @@ def kf_handler(request, msg):
             })
         else:
             corp_user = rs[0]
-        anonymous_name = corp_user.userid
+        anonymous_name = u'%s [企业微信]'%corp_user.userid
 
         channel = request.env.ref('oejia_wx.channel_corp')
         channel_id = channel.id
 
-        session_info = request.env['im_livechat.channel'].sudo().get_mail_channel(channel_id, anonymous_name, msg.content, record_uuid)
+        session_info, ret_msg = request.env['im_livechat.channel'].sudo().create_mail_channel(channel_id, anonymous_name, msg.content, record_uuid)
         if session_info:
             uuid = session_info['uuid']
             client.create_uuid_for_openid(openid, uuid)
             if not record_uuid:
                 corp_user.update_last_uuid(uuid)
-        ret_msg = channel.default_message
 
     if uuid:
         message_content = ''
@@ -106,7 +104,7 @@ def kf_handler(request, msg):
 
         author_id = False  # message_post accept 'False' author_id, but not 'None'
         if request.session.uid:
-            author_id = request.env['res.users'].sudo().browse(from_uid).partner_id.id
+            author_id = request.env['res.users'].sudo().browse(request.session.uid).partner_id.id
         else:
             author_id = uid
         if kf_flag:

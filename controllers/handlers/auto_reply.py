@@ -7,7 +7,6 @@ import datetime
 
 from openerp.http import request
 import openerp
-from .. import client
 
 _logger = logging.getLogger(__name__)
 
@@ -27,24 +26,22 @@ def get_img_data(pic_url):
     r = requests.get(pic_url,headers=headers,timeout=50)
     return r.content
 
-def main(robot):
-
-    def input_handle(message, session):
+if True:
+    def input_handle(request, message):
         from .. import client
-        entry = client.wxenv(request.env)
-        client = entry
+        entry = request.entry
         serviceid = message.target
         openid = message.source
         mtype = message.type
         _logger.info('>>> wx msg: %s'%message.__dict__)
         if message.id==entry.OPENID_LAST.get(openid):
             _logger.info('>>> 重复的微信消息')
-            return
+            return ''
         entry.OPENID_LAST[openid] = message.id
         origin_content = ''
         attachment_ids = []
         if mtype=='image':
-            pic_url = message.img
+            pic_url = message.image
             media_id = message.__dict__.get('MediaId','')
             _logger.info(pic_url)
             _data = get_img_data(pic_url)
@@ -60,7 +57,7 @@ def main(robot):
         elif mtype in ['voice']:
             media_id = message.media_id
             media_format = message.format
-            r = client.wxclient.download_media(media_id)
+            r = entry.wxclient.media.download(media_id)
             _filename = '%s.%s'%(media_id,media_format)
             _data = r.content
             attachment = request.env['ir.attachment'].sudo().create({
@@ -80,20 +77,20 @@ def main(robot):
         rs = request.env()['wx.autoreply'].sudo().search([])
         for rc in rs:
             _key = rc.key.lower()
-            if rc.type==1:
+            if rc.type=='1':
                 if content==_key:
-                    ret_msg = rc.action.get_wx_reply()
+                    ret_msg = rc.action.get_wx_reply(openid)
                     return entry.create_reply(ret_msg, message)
-            elif rc.type==2:
+            elif rc.type=='2':
                 if _key in content:
-                    ret_msg = rc.action.get_wx_reply()
+                    ret_msg = rc.action.get_wx_reply(openid)
                     return entry.create_reply(ret_msg, message)
-            elif rc.type==3:
+            elif rc.type=='3':
                 try:
                     flag = re.compile(_key).match(content)
                 except:flag=False
                 if flag:
-                    ret_msg = rc.action.get_wx_reply()
+                    ret_msg = rc.action.get_wx_reply(openid)
                     return entry.create_reply(ret_msg, message)
         #客服对话
         uuid, record_uuid = entry.get_uuid_from_openid(openid)
@@ -103,17 +100,17 @@ def main(robot):
         if not uuid:
             rs = request.env['wx.user'].sudo().search( [('openid', '=', openid)] )
             if not rs.exists():
-                info = client.wxclient.get_user_info(openid)
+                info = entry.wxclient.user.get(openid)
                 info['group_id'] = ''
                 wx_user = request.env['wx.user'].sudo().create(info)
             else:
                 wx_user = rs[0]
-            anonymous_name = wx_user.nickname
+            anonymous_name = u'%s [公众号]'%wx_user.nickname
 
             channel = request.env.ref('oejia_wx.channel_wx')
             channel_id = channel.id
 
-            session_info, ret_msg = request.env["im_livechat.channel"].create_mail_channel(channel_id, anonymous_name, content, record_uuid)
+            session_info, ret_msg = request.env["im_livechat.channel"].sudo().create_mail_channel(channel_id, anonymous_name, content, record_uuid)
             if session_info:
                 uuid = session_info['uuid']
                 entry.create_uuid_for_openid(openid, uuid)
@@ -130,8 +127,4 @@ def main(robot):
             mail_channel = request.env["mail.channel"].sudo(request_uid).search([('uuid', '=', uuid)], limit=1)
             msg = mail_channel.sudo(request_uid).with_context(mail_create_nosubscribe=True).message_post(author_id=author_id, email_from=mail_channel.anonymous_name, body=message_content, message_type='comment', subtype='mail.mt_comment', content_subtype='plaintext',attachment_ids=attachment_ids)
         if ret_msg:
-            return entry.create_reply(ret_msg, message)
-    robot.add_handler(input_handle, type='text')
-    robot.add_handler(input_handle, type='image')
-    robot.add_handler(input_handle, type='voice')
-    robot.add_handler(input_handle, type='location')
+            return ret_msg
